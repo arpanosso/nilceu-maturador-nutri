@@ -1,0 +1,114 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  warning = FALSE,
+  erro = FALSE,
+  message = FALSE,
+  comment = "#>"
+)
+```
+
+# nilceu-maturador-nutri
+
+##  Carregando Pacotes
+
+```{r}
+library(readxl)
+library(ExpDes.pt)
+library(tidyverse)
+```
+
+
+
+## Leitura do banco de dados
+```{r}
+dados <- read_excel("data/Outlyers.xlsx") %>% 
+  janitor::clean_names() %>% 
+  drop_na()
+dados %>%  glimpse()
+```
+
+## Gráficos temporais
+
+### Boxplots
+
+```{r}
+for(i in 15:length(dados)){
+  variavel <- names(dados[i])
+  df <- dados %>% select(data, nutricao, maturador, variavel)
+  names(df) <- c("data", "nutricao", "maturador", "y")
+  pt <- df %>% 
+    ggplot(aes(x=as.factor(data),y=y,fill=maturador)) +
+    geom_boxplot()+
+    facet_wrap(~nutricao)+
+    theme_classic() +
+    labs(x="Data", y=variavel, fill="Maturador") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          legend.position = "bottom")
+  print(pt)
+}
+```
+### Gráficos de linhas
+
+```{r}
+for(i in 15:length(dados)){
+  variavel <- names(dados[i])
+  df <- dados %>% select(data, nutricao, maturador, variavel)
+  names(df) <- c("data", "nutricao", "maturador", "y")
+  pt <- df %>%
+    group_by(data, nutricao, maturador) %>% 
+    summarise(
+      y= mean(y,na.rm=TRUE)
+    ) %>% 
+    ggplot(aes(x=data,y=y,color=maturador)) +
+    geom_line()+
+    facet_wrap(~nutricao)+geom_point() +
+    theme_classic() +
+    labs(x="Data", y=variavel, fill="Maturador") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          legend.position = "bottom")
+  print(pt)
+}
+```
+### Análise de variância
+
+```{r}
+datas <- dados %>% pull(data) %>% unique()
+for(j in seq_along(datas)){
+  for(i in  15:length(dados)){
+    variavel <- names(dados[i])
+    print("************ Análise de Variância ***************")
+    print(paste0( datas[j],"; ",variavel))
+    print("*************************************************")
+    
+    df <- dados %>% 
+      select(data, nutricao, maturador, tratamento_final, bloco_11, variavel) %>% 
+      filter(data == datas[j])
+    names(df) <- c("data", "nutricao", "maturador", "trat","bloco", "y")
+    # print("--------Análise de resíduos---------")
+    trat <- df %>%  pull(trat)
+    y <- df %>%  pull(y)
+    mod <- aov(y~as.factor(trat))
+    rs<-rstudent(mod)
+    hist(rs)
+    print(shapiro.test(rs))
+    
+    plot(y ~ as.factor(trat))
+    print(lawstat::levene.test(y,trat))
+    
+    print("---------Teste F da ANOVA - DBC -----------")
+    bloco <- df %>% pull(bloco)
+    nutri <- df %>% pull(nutricao)
+    matu <- df %>% pull(maturador)
+    psub2.dbc(nutri,matu,bloco,y,
+              fac.names = c("Nutri","Maturador"))
+  }
+}
+```
+
